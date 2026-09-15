@@ -1,0 +1,6 @@
+# Blackwell/RTX 5090 profile. Use only on a Linux host with a compatible
+# driver. This is a versioned alternative, not a claim that the Mac authoring
+# environment or a future rental instance has passed the GPU preflight.
+torch==2.7.1+cu128
+torchvision==0.22.1+cu128
+triton==3.3.1

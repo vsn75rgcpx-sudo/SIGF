@@ -1,0 +1,5 @@
+# Ada/RTX 4090 profile. CUDA runtime comes from these pinned wheels; the host
+# driver is checked at install/preflight time and is never installed here.
+torch==2.7.1+cu118
+torchvision==0.22.1+cu118
+triton==3.3.1
