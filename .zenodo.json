@@ -1,0 +1,20 @@
+{
+  "title": "MoLG-UNet",
+  "description": "Modality-aware local-global U-Net for multimodal brain tumor segmentation. This software release contains the current nnU-Net v2 implementation, formal ablation configurations, frozen metadata, reproducibility scripts, and evaluation definitions. It does not contain clinical data, case lists, checkpoints, predictions, or environment images.",
+  "creators": [
+    {
+      "name": "Yang Zhifu"
+    }
+  ],
+  "license": "MIT",
+  "upload_type": "software",
+  "publication_date": "2026-09-15",
+  "version": "1.0.0",
+  "language": "eng",
+  "keywords": [
+    "brain tumor segmentation",
+    "medical imaging",
+    "nnU-Net",
+    "deep learning"
+  ]
+}
