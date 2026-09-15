@@ -39,6 +39,16 @@ def test_current_runtime_and_recipes_exist():
     assert "1.0.27" not in common
 
 
+def test_citation_metadata_is_for_the_public_release():
+    citation = (ROOT / "CITATION.cff").read_text(encoding="utf-8")
+    zenodo = json.loads((ROOT / ".zenodo.json").read_text(encoding="utf-8"))
+    assert 'version: "1.0.0"' in citation
+    assert zenodo["version"] == "1.0.0"
+    assert zenodo["upload_type"] == "software"
+    assert zenodo["license"] == "MIT"
+    assert "case lists" in zenodo["description"]
+
+
 def test_public_tree_has_no_case_lists_or_scientific_artifacts():
     forbidden_suffixes = (".nii", ".nii.gz", ".npz", ".npy", ".pth", ".pt", ".zip")
     forbidden_names = {"membership_manifest.json", "case_metrics.csv"}

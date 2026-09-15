@@ -146,6 +146,13 @@ selected by this repository, or that a paper has been accepted. See
 docs/reproduction.md, docs/data.md, docs/metrics.md,
 docs/release_notes.md and docs/security.md.
 
+## Citation
+
+For a published version, cite the versioned GitHub Release and its Zenodo DOI.
+The machine-readable citation metadata is kept in CITATION.cff and
+.zenodo.json. The release does not include private data, weights or
+case-level results.
+
 ## License
 
 Authored repository material is provided under the MIT License in LICENSE.
