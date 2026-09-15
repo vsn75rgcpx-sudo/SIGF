@@ -1,139 +1,153 @@
-# FedMoLG-TCFP
+# MoLG-UNet
 
-Federated modality-aware local-global 3D U-Net for multimodal BraTS tumor segmentation, with a tumor-core distance-aware false-positive suppression loss.
+Modality-aware local-global U-Net for multimodal brain tumor segmentation.
 
-This repository contains the code for the final model used in our experiments:
+This repository contains the current nnU-Net v2 implementation used for the
+MoLG model family and its four formal ablations. The runtime source includes
+the modality-aware input path, local 3D U-Net branch, global Swin branch,
+scale-wise fusion, matched deep supervision, the reviewed composite loss, and
+the independent BraTS-region evaluation utility.
 
-```text
-Modality-specific shallow CNN stems
-+ modality fusion
-+ local 3D U-Net branch
-+ Swin global branch
-+ multi-scale local-global fusion
-+ boundary-aware objective
-+ TC distance-aware false-positive suppression
-+ Dice-HD95 checkpoint selection
-```
+The release is code-first. It does not include clinical data, case lists,
+weights, predictions, full logs, or an environment image.
 
-The model outputs three BraTS region logits:
+## Current implementation
 
-```text
-channel 0: WT
-channel 1: TC
-channel 2: ET
-```
+The public experiment contract is in config/experiments.json. The four formal
+experiments are:
 
-## Highlights
+| Experiment | Trainer | Defined change |
+| --- | --- | --- |
+| no_maf | nnUNetTrainerParallelModalSwinUNetB24NoMAF | Early-fused ConvNormAct3D(4,24) replaces the complete modality-aware input/stem |
+| no_swin | nnUNetTrainerParallelModalSwinUNetB24NoSwin | Removes the global Swin branch and corresponding fusion path |
+| concat_fusion | nnUNetTrainerParallelModalSwinUNetB24ConcatFusion | Replaces all five gated fusions with concatenation plus 1x1 ConvNormAct3D |
+| proposed_loss_ds_matched | nnUNetTrainerParallelModalSwinUNetB24ProposedLossDSMatchedSeed42 | Full MoLG network with the reviewed composite loss and matched deep supervision |
 
-- `parallel_modal_swin_unet3d`: final local-global model.
-- `DistanceAwareTCFalsePositiveLoss`: penalizes tumor-core predictions far from ground-truth TC support.
-- `train_federated_baseline.py`: supports multi-client FedAvg and single-client centralized-like FL training.
-- `paired_case_comparison.py`: case-level paired comparison with W/T/L and Wilcoxon p-values.
-- Unified hierarchical post-processing for WT/TC/ET evaluation.
+The reference implementation is
+nnUNetTrainerParallelModalSwinUNetB24. The proposed-loss deep-supervision
+weights are [8/15, 4/15, 2/15, 1/15, 0], with the TC false-positive term
+applied only at the highest-resolution output. The standard variants use the
+standard nnU-Net region Dice+BCE loss and its standard deep-supervision path.
+NoSwin and proposed-loss/DS-matched are retained; they are not removed because
+their observed result is different.
 
-## Installation
+The earlier FedMoLG-TCFP federated/100-round prototype is retained under
+legacy/fedmolg_tcfp. That historical entry, including its Dice-HD95 selection
+utilities, is not the default current reproduction route.
 
-Create a Python environment and install dependencies:
+## Frozen scientific contract
 
-```bash
-pip install -r requirements.txt
-```
+- Dataset901_BraTS2023_TCRegion, configuration 3d_fullres, plans nnUNetPlans,
+  fold all.
+- Four input channels in order T1, T1ce, T2, FLAIR.
+- Seed 42, 1000 epochs, 250 training iterations and 50 validation iterations
+  per epoch.
+- Patch [128, 160, 112], batch size 2, AMP and torch.compile enabled.
+- SGD with initial learning rate 0.01, momentum 0.99, Nesterov enabled and
+  weight decay 3e-5; nnU-Net polynomial learning-rate schedule.
+- Data augmentation and normalization remain the frozen nnU-Net pipeline.
+- 876 training cases, 375 internal evaluation cases and 100 external novel
+  cases. Internal and external cases are never training cases.
 
-This code was developed with PyTorch and CUDA GPUs. Install a PyTorch build matching your CUDA version from the official PyTorch instructions.
+The 876-case membership was recovered from the complement of the frozen
+internal set within the 2023 archive and checked against matching historical
+case-metrics CSV files. It was not recovered from an original
+splits_final.json; the public repository therefore publishes the method and
+format, not the case identifiers.
 
-## Data Layout
+## Environment
 
-Put BraTS cases under `dataset/train` by default:
+The current verified runtime uses Python 3.10.x, nnunetv2 2.8.0,
+dynamic-network-architectures 0.4.4 and timm 1.0.22. The verified GPU profile
+is:
 
-```text
-dataset/train/
-  BraTS-GLI-00000-000/
-    *t1n*.nii.gz   or *t1*.nii.gz
-    *t1c*.nii.gz   or *t1ce*.nii.gz
-    *t2w*.nii.gz   or *t2*.nii.gz
-    *t2f*.nii.gz   or *flair*.nii.gz
-    *seg*.nii.gz
-```
+- Blackwell/RTX 5090: Torch 2.7.1+cu128, torchvision 0.22.1+cu128, Triton
+  3.3.1.
+An Ada/RTX 4090 cu118 recipe is retained as an explicitly separate
+alternative, but it requires its own Linux installation and GPU preflight;
+it is not claimed as validated by this release.
 
-The loader maps label `4` to `3` for ET.
+The exact common recipe is requirements/constraints-common-runtime.txt and one
+profile file. The old timm 1.0.27 file is not part of the default recipe.
+provenance/environment_freeze_public.txt records the actual verified package
+versions without private wheel URLs.
 
-## Main Single-Client Run
+Install and verify on an authorized Linux host:
 
-The strongest single-client FL-pipeline setting is:
+    bash scripts/install_environment.sh --profile blackwell5090-cu128 --prefix /persistent/molg/envs/molg-cu128
+    bash scripts/install_environment.sh --profile blackwell5090-cu128 --prefix /persistent/molg/envs/molg-cu128 --apply
+    /persistent/molg/envs/molg-cu128/bin/python scripts/install_custom_trainer.py --apply
+    /persistent/molg/envs/molg-cu128/bin/python scripts/verify_environment.py --profile blackwell5090-cu128 --out /persistent/molg/reports/environment.json
 
-```bash
-bash scripts/run_single_client_full_tcfp.sh
-```
+The first command is inspect-only; --apply is required for any installation.
+The installer requires Linux, Python 3.10 and a matching GPU profile. It does
+not install drivers, upload code, rent instances or alter a global Python.
 
-Equivalent command:
+## Data preparation
 
-```bash
-CUDA_VISIBLE_DEVICES=0 python -u baselines/train_federated_baseline.py \
-  --exp_name centralized_parallel_modal_swin_unet3d_b24_boundary_dicehd95_tcfp010_r100 \
-  --model parallel_modal_swin_unet3d \
-  --num_clients 1 \
-  --base_channels 24 \
-  --rounds 100 \
-  --warmup_rounds 20 \
-  --local_epochs 1 \
-  --batch_size 2 \
-  --loss_type boundary \
-  --tc_fp_weight 0.10 \
-  --tc_fp_distance 32 \
-  --tc_fp_power 1.0 \
-  --checkpoint_score dice_hd95 \
-  --checkpoint_score_candidates 8 \
-  --amp
-```
+Use only legally obtained data and the authorized membership files. The
+lossless utility in runtime/baselines/prepare_data_lossless.py:
 
-Outputs are saved to:
+- streams nested 2023 ZIP NIfTI members without loading and re-serializing
+  voxel arrays;
+- copies existing GoAT .nii.gz payloads byte-for-byte;
+- rejects path traversal, non-regular archive members, duplicate modalities,
+  incomplete markers and unmarked collisions;
+- does not run an automatic planner or invent a split.
 
-```text
-results/<exp_name>/case_metrics.json
-results/<exp_name>/final_metrics.json
-checkpoints/<exp_name>/fedavg_final_avg_model_dice_hd95.pth
-```
+The full membership, lossless staging and frozen preprocessing commands are
+documented in docs/data.md. Keep raw/staged/preprocessed data on a data volume
+and code, logs, checkpoints and recovery records on a separate persistent
+volume.
 
-## Ablation Runs
+## Training
 
-Run the single-client ablations:
+The public launcher is inspect-only unless --execute-training is supplied.
+It accepts full_molg, no_maf, no_swin, concat_fusion and
+proposed_loss_ds_matched. A real run requires a current preflight report and
+an empty persistent run root:
 
-```bash
-bash scripts/run_single_client_ablations.sh
-```
+    /persistent/molg/envs/molg-cu128/bin/python scripts/preflight.py --experiment proposed_loss_ds_matched --profile blackwell5090-cu128 --data-root /data/molg --persistent-root /persistent/molg --out /persistent/molg/preflight/proposed_loss_ds_matched.json --execute
+    CUDA_VISIBLE_DEVICES=0 bash scripts/train_one_experiment.sh --experiment proposed_loss_ds_matched --profile blackwell5090-cu128 --env-prefix /persistent/molg/envs/molg-cu128 --data-root /data/molg --persistent-root /persistent/molg --run-root /persistent/molg/runs/proposed_loss_ds_matched-YYYYMMDD --preflight /persistent/molg/preflight/proposed_loss_ds_matched.json --execute-training
 
-The ablations cover:
+The launcher records the actual trainer, run paths, command, worker setting,
+thread settings and exit status. It creates an independent short
+/tmp/molg-* directory per run. A resume may use only that run's
+checkpoint_latest.pth with nnU-Net's full-state --c path; it does not rename a
+best checkpoint or silently fall back to a new run. The checkpoint contract
+checker is CPU-only and reports field completeness; actual restoration is
+proven only by loading the checkpoint with the installed trainer.
 
-- w/o Swin global branch
-- w/o modality-specific stems
-- w/o TC-FP loss
-- w/o boundary objective
-- w/o Dice-HD95 checkpoint selection
-- U-Net baselines
+## Evaluation
 
-## Paired Comparison
+The evaluator in runtime/baselines/evaluate_prediction_folder.py computes
+WT, TC and ET case-level Dice, HD95 and NSD. It maps source label 4 to 3,
+uses hierarchical connected-component thresholds WT 300, TC 50 and ET 30,
+and applies the fixed HD95 rule: both masks empty is 0, exactly one empty or
+an empty surface is 374. Summary standard deviations use ddof=1.
 
-Example:
+Training pseudo Dice is not an internal375 or external novel100 test result.
+Formal evaluation uses the corresponding checkpoint_final.pth, the authorized
+case group, and the fixed inference/post-processing contract. See
+docs/metrics.md for the command and details.
 
-```bash
-python baselines/paired_case_comparison.py \
-  --method results/centralized_parallel_modal_swin_unet3d_b24_boundary_dicehd95_tcfp010_r100/case_metrics.json \
-  --baseline results/central1_full_b24_boundary_dicehd95_r100/case_metrics.json \
-  --method_name Full-TCFP \
-  --baseline_name w/o-TCFP \
-  --out results/paired_full_tcfp_vs_no_tcfp_central1.json \
-  --csv_out results/paired_full_tcfp_vs_no_tcfp_central1.csv
-```
+## Validation status and scope
 
-Summarize multiple paired JSON files:
+This release has passed local Python parsing, shell parsing, JSON contract
+checks, public-material scans, source-hash comparison to the reviewed
+recipe-v2 snapshot, and dependency-free synthetic checks. It has not been
+cold-start installed or GPU-validated from this public clone on the Mac
+authoring environment. Real data staging, frozen preprocessing, GPU
+preflight, training, resume execution and full internal/external reproduction
+remain host- and data-dependent.
 
-```bash
-python baselines/summarize_paired_results.py results/paired_*.json
-```
+No claim is made that the model is universally superior, that results are
+selected by this repository, or that a paper has been accepted. See
+docs/reproduction.md, docs/data.md, docs/metrics.md,
+docs/release_notes.md and docs/security.md.
 
-## Notes
+## License
 
-- Do not upload BraTS data, checkpoints, logs, or generated results to GitHub.
-- Keep `case_metrics.json` for paired statistical analysis.
-- If you use this code in a paper, report whether results are from multi-client FL, single-client FL-pipeline, or ordinary centralized training.
-
+Authored repository material is provided under the MIT License in LICENSE.
+Dependencies remain under their own licenses; see
+THIRD_PARTY_NOTICES.md.

@@ -1,0 +1,113 @@
+{
+  "schema_version": 2,
+  "project": {
+    "name": "MoLG-UNet",
+    "description": "Modality-aware local-global U-Net for multimodal brain tumor segmentation",
+    "dataset": "Dataset901_BraTS2023_TCRegion",
+    "configuration": "3d_fullres",
+    "plans": "nnUNetPlans",
+    "fold": "all"
+  },
+  "data_contract": {
+    "modalities": ["T1", "T1ce", "T2", "FLAIR"],
+    "modality_order": ["t1n", "t1c", "t2w", "t2f"],
+    "output_regions": ["WT", "TC", "ET"],
+    "label_mapping": "source label 4 is mapped to region label 3 before region scoring",
+    "training_cases": 876,
+    "internal_cases": 375,
+    "external_novel_cases": 100,
+    "training_membership_provenance": "recovered from matching historical case-metrics CSV complements; it is not an original splits_final.json",
+    "membership_policy": "case identifiers and source CSVs are supplied only under the data owner's distribution permission"
+  },
+  "scientific_contract": {
+    "seed": 42,
+    "total_epochs": 1000,
+    "train_iterations_per_epoch": 250,
+    "validation_iterations_per_epoch": 50,
+    "patch_size": [128, 160, 112],
+    "batch_size": 2,
+    "optimizer": {
+      "name": "SGD",
+      "initial_lr": 0.01,
+      "momentum": 0.99,
+      "nesterov": true,
+      "weight_decay": 0.00003
+    },
+    "learning_rate_schedule": "nnU-Net polynomial schedule",
+    "augmentation": "nnU-Net frozen augmentation and normalization pipeline",
+    "amp": true,
+    "torch_compile": true,
+    "pretrained": false,
+    "planner_policy": "use the supplied nnUNetPlans; do not run a new planner"
+  },
+  "formal_experiments": {
+    "no_maf": {
+      "trainer": "nnUNetTrainerParallelModalSwinUNetB24NoMAF",
+      "network": "ParallelSwinUNetNoMAF",
+      "loss": "standard nnU-Net region Dice+BCE with standard deep supervision",
+      "change": "replace the complete modality-aware input/stem with early-fused ConvNormAct3D(4,24)"
+    },
+    "no_swin": {
+      "trainer": "nnUNetTrainerParallelModalSwinUNetB24NoSwin",
+      "network": "ParallelModalUNetNoSwin",
+      "loss": "standard nnU-Net region Dice+BCE with standard deep supervision",
+      "change": "remove the global Swin branch and corresponding fusion path while retaining the local modality-aware path and decoder"
+    },
+    "concat_fusion": {
+      "trainer": "nnUNetTrainerParallelModalSwinUNetB24ConcatFusion",
+      "network": "ParallelModalSwinUNetConcatFusion",
+      "loss": "standard nnU-Net region Dice+BCE with standard deep supervision",
+      "change": "replace all five gated fusion blocks with concatenation plus 1x1 ConvNormAct3D"
+    },
+    "proposed_loss_ds_matched": {
+      "trainer": "nnUNetTrainerParallelModalSwinUNetB24ProposedLossDSMatchedSeed42",
+      "network": "ParallelModalSwinUNet",
+      "loss": "boundary/curvature-aware region loss plus TC distance-aware false-positive penalty",
+      "deep_supervision_weights": [0.5333333333333333, 0.2666666666666667, 0.1333333333333333, 0.0666666666666667, 0.0],
+      "tc_fp_scope": "highest-resolution output only",
+      "loss_parameters": {
+        "boundary_weight": 0.5,
+        "curvature_weight": 2.0,
+        "et_weight": 1.5,
+        "bce_weight": 0.5,
+        "tc_fp_weight": 0.1,
+        "tc_fp_distance": 32.0,
+        "tc_fp_power": 1.0,
+        "tc_fp_min_distance": 0.0
+      }
+    }
+  },
+  "reference_implementation": {
+    "trainer": "nnUNetTrainerParallelModalSwinUNetB24",
+    "network": "ParallelModalSwinUNet",
+    "status": "implementation is included; the four formal experiments above are the published closeout scope"
+  },
+  "evaluation_contract": {
+    "checkpoint": "checkpoint_final.pth",
+    "groups": ["internal375", "external_novel100"],
+    "sliding_window_step": 0.5,
+    "gaussian": true,
+    "mirroring": true,
+    "postprocess_components_voxels": {"WT": 300, "TC": 50, "ET": 30},
+    "hd95_empty_rule": "both empty = 0; exactly one empty or empty surface = 374 sentinel",
+    "summary": "case-level mean and sample standard deviation (ddof=1); no result selection by the summary"
+  },
+  "runtime_policy": {
+    "python": "3.10.x",
+    "nnunetv2": "2.8.0",
+    "dynamic_network_architectures": "0.4.4",
+    "timm": "1.0.22",
+    "current_verified_gpu_profile": "blackwell5090-cu128",
+    "blackwell_profile": "Torch 2.7.1+cu128, torchvision 0.22.1+cu128, Triton 3.3.1",
+    "ada_profile": "Torch 2.7.1+cu118, torchvision 0.22.1+cu118, Triton 3.3.1; alternative recipe requiring separate validation",
+    "library_threads": 1,
+    "augmentation_workers": "explicit runtime parameter; validate on the target host",
+    "temporary_directory": "each run uses an independent short directory under /tmp",
+    "resume": "same run root and checkpoint_latest.pth only; restore full nnU-Net state before continuing"
+  },
+  "historical_entries": {
+    "path": "legacy/fedmolg_tcfp",
+    "status": "retained for provenance and comparison only; not the default reproduction entry point",
+    "notes": "contains the original federated/100-round workflow and its Dice-HD95 selection utilities"
+  }
+}

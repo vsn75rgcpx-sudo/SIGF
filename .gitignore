@@ -5,21 +5,54 @@ __pycache__/
 .idea/
 .vscode/
 
+# Private data and generated scientific outputs
 dataset/
 data/
+raw/
+staged/
+nnUNet_raw/
+nnUNet_preprocessed/
+preprocessed/
+predictions/
 logs/
 results/
 checkpoints/
 figures/
+metrics/
 *.pth
 *.pt
 *.nii
 *.nii.gz
 *.npz
 *.npy
+*.h5
+*.hdf5
+*.zip
+*.tar
+*.tar.gz
+*.7z
+*.csv
+membership/
+*case_metrics*
+*splits_final*
 
+# Local environments and package caches
 wandb/
 runs/
 .env
 .venv/
 venv/
+env/
+envs/
+offline_wheelhouse/
+wheelhouse/
+*.lock
+*.installing.lock
+
+# Local provenance and platform state
+.DS_Store
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
