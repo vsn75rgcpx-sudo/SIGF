@@ -6,9 +6,10 @@ This repository provides the nnU-Net v2 implementation of SIGF for supervised
 segmentation of whole tumor (WT), tumor core (TC), and enhancing tumor (ET)
 from four MRI sequences: T1, T1ce, T2, and FLAIR.
 
-SIGF is the name used in the manuscript. The repository URL, experiment key
-`full_molg`, and Python class names retain the earlier MoLG-UNet naming so
-existing commands and checkpoints remain compatible.
+The paper and repository are named SIGF. The current repository URL is
+https://github.com/vsn75rgcpx-sudo/SIGF. The experiment key `full_molg` and
+Python class names retain the earlier MoLG-UNet naming so existing commands
+and checkpoints remain compatible.
 
 ## Architecture
 

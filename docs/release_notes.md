@@ -3,9 +3,10 @@
 ## SIGF manuscript alignment on 2026-10-29
 
 The repository now presents **SIGF: Sequence Integration and Gated Fusion for
-Brain Tumor Segmentation** as its paper-facing name. The existing MoLG
-repository URL, model classes, experiment key `full_molg`, and checkpoint
-layout are retained.
+Brain Tumor Segmentation** as its paper-facing name. The GitHub repository
+was renamed from MoLG-UNet to SIGF on 2026-10-29; its current URL is
+https://github.com/vsn75rgcpx-sudo/SIGF. Model classes, the experiment key
+`full_molg`, and checkpoint layouts retain their compatible identifiers.
 
 The paper experiments are the standard Dice–BCE main model (`full_molg`) and
 three structural ablations (`no_maf`, `no_swin`, `concat_fusion`). The

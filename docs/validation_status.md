@@ -23,7 +23,8 @@ Checks completed for this update:
 - all 40 Python files parsed and all eight shell entry points passed bash -n;
 - 19 local documentation links resolved and four Bash example blocks parsed;
 - all 13 published runtime source hashes and all three frozen metadata hashes
-  matched; runtime/ and frozen/ have no changes from the audited snapshot;
+  matched; scientific runtime sources and the three frozen metadata files
+  have no changes from the audited snapshot;
 - git diff --check passed, and independent review found no remaining release
   blockers.
 

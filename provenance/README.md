@@ -25,8 +25,8 @@ repository on the authoring Mac.
 
 ## SIGF paper alignment
 
-The paper calls the model SIGF. The existing MoLG-UNet repository name,
-trainer class names and checkpoint directories identify the same implementation.
+The paper and repository are named SIGF. Trainer class names and checkpoint
+directories retain earlier MoLG identifiers for the same implementation.
 The 2026-10-29 alignment updates public documentation, experiment metadata and
 run seed records. Runtime model, trainer, loss, preprocessing and evaluation
 sources under runtime/ and the frozen scientific metadata are unchanged.

@@ -1,6 +1,6 @@
 {
   "title": "SIGF: Sequence Integration and Gated Fusion for Brain Tumor Segmentation",
-  "description": "SIGF combines sequence-specific shallow MRI feature extraction, voxel-wise modality attention and multiscale gated fusion of parallel CNN and hierarchical Swin encoders. The original MoLG-UNet repository and implementation identifiers are retained for compatibility. The paper workflow uses standard nnU-Net region Dice-BCE supervision for the full model and three structural ablations; a separate composite-loss experiment is included as additional work. The code package includes frozen metadata, training and evaluation entry points, but does not include clinical data, case lists, checkpoints, predictions, full logs or environment images.",
+  "description": "SIGF combines sequence-specific shallow MRI feature extraction, voxel-wise modality attention and multiscale gated fusion of parallel CNN and hierarchical Swin encoders. The repository is named SIGF; implementation identifiers retain the earlier MoLG-UNet naming for compatibility. The paper workflow uses standard nnU-Net region Dice-BCE supervision for the full model and three structural ablations; a separate composite-loss experiment is included as additional work. The code package includes frozen metadata, training and evaluation entry points, but does not include clinical data, case lists, checkpoints, predictions, full logs or environment images.",
   "creators": [
     {
       "name": "Yang, Zhifu"

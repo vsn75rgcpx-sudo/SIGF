@@ -1,13 +1,13 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite the versioned release."
 title: "SIGF: Sequence Integration and Gated Fusion for Brain Tumor Segmentation"
-abstract: "SIGF integrates sequence-specific shallow features and uses multiscale gated fusion of parallel CNN and hierarchical Swin features for multimodal brain tumor segmentation. The repository and implementation identifiers retain the original MoLG-UNet name."
+abstract: "SIGF integrates sequence-specific shallow features and uses multiscale gated fusion of parallel CNN and hierarchical Swin features for multimodal brain tumor segmentation. Implementation identifiers retain the earlier MoLG-UNet naming for checkpoint compatibility."
 authors:
   - family-names: "Yang"
     given-names: "Zhifu"
 version: "1.0.0"
 date-released: "2026-09-15"
-repository-code: "https://github.com/vsn75rgcpx-sudo/MoLG-UNet"
+repository-code: "https://github.com/vsn75rgcpx-sudo/SIGF"
 license: "MIT"
 keywords:
   - brain-tumor-segmentation
