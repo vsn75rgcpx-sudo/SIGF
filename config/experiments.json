@@ -1,12 +1,13 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "project": {
-    "name": "MoLG-UNet",
-    "description": "Modality-aware local-global U-Net for multimodal brain tumor segmentation",
+    "name": "SIGF",
+    "description": "Sequence Integration and Gated Fusion for Brain Tumor Segmentation",
     "dataset": "Dataset901_BraTS2023_TCRegion",
     "configuration": "3d_fullres",
     "plans": "nnUNetPlans",
-    "fold": "all"
+    "fold": "all",
+    "legacy_name": "MoLG-UNet"
   },
   "data_contract": {
     "modalities": ["T1", "T1ce", "T2", "FLAIR"],
@@ -20,7 +21,6 @@
     "membership_policy": "case identifiers and source CSVs are supplied only under the data owner's distribution permission"
   },
   "scientific_contract": {
-    "seed": 42,
     "total_epochs": 1000,
     "train_iterations_per_epoch": 250,
     "validation_iterations_per_epoch": 50,
@@ -38,49 +38,48 @@
     "amp": true,
     "torch_compile": true,
     "pretrained": false,
-    "planner_policy": "use the supplied nnUNetPlans; do not run a new planner"
+    "planner_policy": "use the supplied nnUNetPlans; do not run a new planner",
+    "seed_policy": "Defined per experiment; the historical full_molg entry point does not fix initialization seeds."
   },
   "formal_experiments": {
+    "full_molg": {
+      "trainer": "nnUNetTrainerParallelModalSwinUNetB24",
+      "network": "ParallelModalSwinUNet",
+      "loss": "standard nnU-Net region Dice+BCE with standard deep supervision",
+      "role": "SIGF main model reported in the manuscript",
+      "seed": null,
+      "seed_policy": "not_fixed_by_entrypoint"
+    },
     "no_maf": {
       "trainer": "nnUNetTrainerParallelModalSwinUNetB24NoMAF",
       "network": "ParallelSwinUNetNoMAF",
       "loss": "standard nnU-Net region Dice+BCE with standard deep supervision",
-      "change": "replace the complete modality-aware input/stem with early-fused ConvNormAct3D(4,24)"
+      "change": "replace the complete modality-aware input/stem with early-fused ConvNormAct3D(4,24)",
+      "seed": 42,
+      "seed_policy": "fixed_by_seeded_trainer"
     },
     "no_swin": {
       "trainer": "nnUNetTrainerParallelModalSwinUNetB24NoSwin",
       "network": "ParallelModalUNetNoSwin",
       "loss": "standard nnU-Net region Dice+BCE with standard deep supervision",
-      "change": "remove the global Swin branch and corresponding fusion path while retaining the local modality-aware path and decoder"
+      "change": "remove the global Swin branch and corresponding fusion path while retaining the local modality-aware path and decoder",
+      "seed": 42,
+      "seed_policy": "fixed_by_seeded_trainer"
     },
     "concat_fusion": {
       "trainer": "nnUNetTrainerParallelModalSwinUNetB24ConcatFusion",
       "network": "ParallelModalSwinUNetConcatFusion",
       "loss": "standard nnU-Net region Dice+BCE with standard deep supervision",
-      "change": "replace all five gated fusion blocks with concatenation plus 1x1 ConvNormAct3D"
-    },
-    "proposed_loss_ds_matched": {
-      "trainer": "nnUNetTrainerParallelModalSwinUNetB24ProposedLossDSMatchedSeed42",
-      "network": "ParallelModalSwinUNet",
-      "loss": "boundary/curvature-aware region loss plus TC distance-aware false-positive penalty",
-      "deep_supervision_weights": [0.5333333333333333, 0.2666666666666667, 0.1333333333333333, 0.0666666666666667, 0.0],
-      "tc_fp_scope": "highest-resolution output only",
-      "loss_parameters": {
-        "boundary_weight": 0.5,
-        "curvature_weight": 2.0,
-        "et_weight": 1.5,
-        "bce_weight": 0.5,
-        "tc_fp_weight": 0.1,
-        "tc_fp_distance": 32.0,
-        "tc_fp_power": 1.0,
-        "tc_fp_min_distance": 0.0
-      }
+      "change": "replace all five gated fusion blocks with concatenation plus 1x1 ConvNormAct3D",
+      "seed": 42,
+      "seed_policy": "fixed_by_seeded_trainer"
     }
   },
   "reference_implementation": {
     "trainer": "nnUNetTrainerParallelModalSwinUNetB24",
     "network": "ParallelModalSwinUNet",
-    "status": "implementation is included; the four formal experiments above are the published closeout scope"
+    "status": "SIGF main model; legacy experiment and trainer names are retained for checkpoint compatibility",
+    "experiment": "full_molg"
   },
   "evaluation_contract": {
     "checkpoint": "checkpoint_final.pth",
@@ -88,9 +87,17 @@
     "sliding_window_step": 0.5,
     "gaussian": true,
     "mirroring": true,
-    "postprocess_components_voxels": {"WT": 300, "TC": 50, "ET": 30},
+    "postprocess_components_voxels": {
+      "WT": 300,
+      "TC": 50,
+      "ET": 30
+    },
     "hd95_empty_rule": "both empty = 0; exactly one empty or empty surface = 374 sentinel",
-    "summary": "case-level mean and sample standard deviation (ddof=1); no result selection by the summary"
+    "summary": "case-level mean and sample standard deviation (ddof=1); no result selection by the summary",
+    "group_labels": {
+      "internal375": "BraTS 2023 test case list",
+      "external_novel100": "image-deduplicated supplemental BraTS-GoAT 2024 cohort; legacy group identifier retained"
+    }
   },
   "runtime_policy": {
     "python": "3.10.x",
@@ -109,5 +116,27 @@
     "path": "legacy/fedmolg_tcfp",
     "status": "retained for provenance and comparison only; not the default reproduction entry point",
     "notes": "contains the original federated/100-round workflow and its Dice-HD95 selection utilities"
+  },
+  "additional_experiments": {
+    "proposed_loss_ds_matched": {
+      "trainer": "nnUNetTrainerParallelModalSwinUNetB24ProposedLossDSMatchedSeed42",
+      "network": "ParallelModalSwinUNet",
+      "loss": "boundary/curvature-aware region loss plus TC distance-aware false-positive penalty",
+      "deep_supervision_weights": [0.5333333333333333, 0.2666666666666667, 0.1333333333333333, 0.0666666666666667, 0.0],
+      "tc_fp_scope": "highest-resolution output only",
+      "loss_parameters": {
+        "boundary_weight": 0.5,
+        "curvature_weight": 2.0,
+        "et_weight": 1.5,
+        "bce_weight": 0.5,
+        "tc_fp_weight": 0.1,
+        "tc_fp_distance": 32.0,
+        "tc_fp_power": 1.0,
+        "tc_fp_min_distance": 0.0
+      },
+      "seed": 42,
+      "seed_policy": "fixed_by_seeded_trainer",
+      "status": "additional loss experiment; not the standard Dice-BCE model reported in the SIGF manuscript"
+    }
   }
 }

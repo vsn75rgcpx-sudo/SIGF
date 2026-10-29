@@ -71,6 +71,12 @@ def main() -> None:
             raise RuntimeError(f"missing root: {path}")
     config_path = root / "config/experiments.json"
     config = json.loads(config_path.read_text(encoding="utf-8"))
+    scope = "formal_experiments" if args.experiment in config["formal_experiments"] else "additional_experiments"
+    experiment = config[scope][args.experiment]
+    if experiment["trainer"] != TRAINERS[args.experiment] or experiment["network"] != MODELS[args.experiment]:
+        raise RuntimeError("experiment configuration differs from the public entry point")
+    scientific_contract = dict(config["scientific_contract"])
+    scientific_contract.update(seed=experiment["seed"], seed_policy=experiment["seed_policy"])
     metadata = {}
     for name in ("dataset.json", "nnUNetPlans.json", "dataset_fingerprint.json"):
         path = root / "frozen" / name
@@ -130,7 +136,10 @@ def main() -> None:
         "configuration": "3d_fullres",
         "plans": "nnUNetPlans",
         "fold": "all",
-        "scientific_contract": config["scientific_contract"],
+        "experiment_scope": scope,
+        "seed": experiment["seed"],
+        "seed_policy": experiment["seed_policy"],
+        "scientific_contract": scientific_contract,
         "augmentation_workers": args.augmentation_workers,
         "validation_workers_derived": max(1, args.augmentation_workers // 2),
         "library_threads": 1,

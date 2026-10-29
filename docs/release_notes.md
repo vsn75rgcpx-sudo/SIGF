@@ -1,27 +1,42 @@
 # Release notes
 
-## Public MoLG-UNet release
+## SIGF manuscript alignment on 2026-10-29
 
-The initial FedMoLG-TCFP tree is retained under
-legacy/fedmolg_tcfp. Its federated, 100-round and Dice-HD95 model-selection
-workflow remains available as historical code, but it is not the default
-reproduction route.
+The repository now presents **SIGF: Sequence Integration and Gated Fusion for
+Brain Tumor Segmentation** as its paper-facing name. The existing MoLG
+repository URL, model classes, experiment key `full_molg`, and checkpoint
+layout are retained.
 
-The current runtime sources were taken from the reviewed recipe-v2 snapshot.
-The scientific files are copied unchanged. Public changes are limited to:
+The paper experiments are the standard Dice–BCE main model (`full_molg`) and
+three structural ablations (`no_maf`, `no_swin`, `concat_fusion`). The
+composite-loss experiment `proposed_loss_ds_matched` is documented separately
+as an additional experiment. Main training and evaluation examples now select
+`full_molg`.
 
-- relocating the earlier public prototype under a clearly labelled legacy
-  path;
-- adding the current trainer and model modules, frozen metadata and exact
-  version recipes;
-- adding generic path-parameterized install, environment, preflight, train
-  and evaluation entry points;
-- documenting the four formal ablations, the full reference trainer, data
-  boundaries, checkpoint policy and metrics;
-- removing private run identities, private paths and case-level membership
-  files from the release surface.
+The update also corrects seed reporting: the main B24 trainer does not apply
+the custom seed variable, while the three ablation trainers apply seed 42.
+Launcher metadata must describe the selected trainer's behavior rather than
+imply that exporting a variable fixes all models' RNGs. This documentation
+update does not establish historical run seeds.
 
-The release does not claim that every package can be cold-start installed on
-every Linux distribution, or that one model is universally superior. Reported
-experimental results are kept with the private evaluation backup rather than
-used to alter the implementation.
+The model architecture, training loss implementations, frozen plans,
+postprocessing, and metric implementations are preserved. Documentation
+clarifies the data/materials available and distinguishes static verification
+from a full GPU reproduction. No new training results are introduced by this
+update.
+
+## Public MoLG-UNet release on 2026-09-15
+
+The initial FedMoLG-TCFP tree was retained under `legacy/fedmolg_tcfp`. Its
+federated, 100-round, and Dice–HD95 model-selection workflow remains available
+as historical code.
+
+The runtime sources were taken from the reviewed recipe-v2 snapshot. Public
+packaging added the current trainer/model modules, frozen metadata, version
+recipes, and path-parameterized environment, preprocessing, training, and
+evaluation entry points. Private run identities, paths, membership files,
+weights, predictions, and full logs were not distributed.
+
+The original release covered three structural ablations and a composite-loss
+experiment, with the full standard-loss model listed as a reference. The
+2026-10-29 update aligns that presentation with the current SIGF manuscript.

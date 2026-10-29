@@ -22,3 +22,24 @@ deliberately omitted.
 The release has not performed a fresh Linux cold-start install, CUDA driver
 check, GPU preflight, full data preparation, training, or evaluation from this
 repository on the authoring Mac.
+
+## SIGF paper alignment
+
+The paper calls the model SIGF. The existing MoLG-UNet repository name,
+trainer class names and checkpoint directories identify the same implementation.
+The 2026-10-29 alignment updates public documentation, experiment metadata and
+run seed records. Runtime model, trainer, loss, preprocessing and evaluation
+sources under runtime/ and the frozen scientific metadata are unchanged.
+
+The source hash manifest covers only files actually shipped under runtime/.
+An obsolete entry for compare_case_metrics.py was removed because that file
+was not included in the public package. This manifest does not establish the
+identity of private checkpoints or reproduce the paper's case-level statistics.
+The package does not include the complete statistical analysis workflow.
+
+The full_molg entry retains its original B24 trainer, which does not read the
+custom NNUNET_RUN_SEED variable. Its seed is therefore recorded as not fixed
+by this entry point. The three structural ablations use seeded trainers with
+seed 42. Metadata from older wrappers may say seed 42 for full_molg; that field
+alone does not show that the seed was applied. Existing historical records must
+be retained rather than rewritten as proof of a different training protocol.

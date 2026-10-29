@@ -6,7 +6,7 @@ T1, T1ce, T2, FLAIR. Labels use WT = labels greater than zero, TC = labels 1
 or 3, and ET = label 3; source label 4 is normalized to 3.
 
 The frozen protocol uses 876 training cases, 375 internal cases and 100
-external novel cases. Internal and external cases are evaluation-only. The
+supplemental cases. The internal and supplemental case lists are evaluation-only. The
 876-case training membership was recovered as the complement of the frozen
 internal375 set within the 2023 archive, with consistency checks against four
 historical case-metrics CSV sources. No original splits_final.json was
@@ -49,3 +49,24 @@ The caller must keep raw/staged/preprocessed data on a data volume and keep
 code, logs, checkpoints and recovery records on a persistent volume. Do not
 place either volume inside the other. The source archives remain under the
 data owner's control.
+
+## Relationship to the paper cohorts
+
+The paper uses the names BraTS 2023 test list (375 cases) and image-deduplicated
+BraTS-GoAT 2024 supplemental cohort (100 cases). The existing directory and
+command identifier external_novel100 refers to the latter cohort; it is kept
+for compatibility and is not a claim of independent clinical-site validation.
+
+The membership command above recovers the already selected case lists from
+historical case-metrics CSVs and checks their counts and archive availability.
+It does not perform the cross-dataset image comparison used to construct the
+paper's supplemental cohort. The public package does not include the original
+image-deduplication workflow or its audit records. Those materials and the
+cohort lists are needed to independently verify the same cohort selection.
+
+Public access to the BraTS source images alone does not supply the private
+CSVs required by this membership procedure. If the cohort files cannot be
+obtained from the authors under the applicable data terms, readers can run
+the method on their own documented split but cannot claim an exact reproduction
+of the paper's specified cohorts or table values. No script in this package
+fetches private files or reconstructs missing case membership by assumption.

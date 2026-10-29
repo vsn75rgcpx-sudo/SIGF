@@ -1,160 +1,121 @@
-# MoLG-UNet
+# SIGF
 
-Modality-aware local-global U-Net for multimodal brain tumor segmentation.
+**Sequence Integration and Gated Fusion for Brain Tumor Segmentation**
 
-This repository contains the current nnU-Net v2 implementation used for the
-MoLG model family and its four formal ablations. The runtime source includes
-the modality-aware input path, local 3D U-Net branch, global Swin branch,
-scale-wise fusion, matched deep supervision, the reviewed composite loss, and
-the independent BraTS-region evaluation utility.
+This repository provides the nnU-Net v2 implementation of SIGF for supervised
+segmentation of whole tumor (WT), tumor core (TC), and enhancing tumor (ET)
+from four MRI sequences: T1, T1ce, T2, and FLAIR.
 
-The release is code-first. It does not include clinical data, case lists,
-weights, predictions, full logs, or an environment image.
+SIGF is the name used in the manuscript. The repository URL, experiment key
+`full_molg`, and Python class names retain the earlier MoLG-UNet naming so
+existing commands and checkpoints remain compatible.
 
-## Current implementation
+## Architecture
 
-The public experiment contract is in config/experiments.json. The four formal
-experiments are:
+SIGF first extracts shallow features separately from each MRI sequence and
+combines them through voxel-wise modality attention. Parallel CNN and
+hierarchical Swin encoders then process the shared representation. Gated
+residual fusion supplies features at five scales to the decoder.
 
-| Experiment | Trainer | Defined change |
+- Each modality stem contains two 3D convolution blocks and produces 12
+  channels. Attention combines these features before projection to 24 channels.
+- The two encoding paths use 24, 48, 96, 192, and 384 channels. Each path
+  passes its own features to the next scale; fused features feed the decoder.
+- Swin attention uses 3×3×3 windows, with shifted attention in the second
+  bottleneck block.
+- Training uses region-based Dice–BCE and multiscale deep supervision: one
+  full-resolution output and three auxiliary outputs. Inference returns the
+  full-resolution output.
+
+The registered model has **19,144,082 parameters (19.14M)**, including its
+auxiliary segmentation heads. The main implementation is
+[`ParallelModalSwinUNet`](runtime/nnunetv2_custom/modal_swin_unet.py), selected
+by `nnUNetTrainerParallelModalSwinUNetB24`.
+
+## Experiments reported in the manuscript
+
+The main model and the three structural ablations all use standard nnU-Net
+region Dice–BCE supervision. Their definitions are recorded in
+[`config/experiments.json`](config/experiments.json).
+
+| Experiment key | Model | Structural change |
 | --- | --- | --- |
-| no_maf | nnUNetTrainerParallelModalSwinUNetB24NoMAF | Early-fused ConvNormAct3D(4,24) replaces the complete modality-aware input/stem |
-| no_swin | nnUNetTrainerParallelModalSwinUNetB24NoSwin | Removes the global Swin branch and corresponding fusion path |
-| concat_fusion | nnUNetTrainerParallelModalSwinUNetB24ConcatFusion | Replaces all five gated fusions with concatenation plus 1x1 ConvNormAct3D |
-| proposed_loss_ds_matched | nnUNetTrainerParallelModalSwinUNetB24ProposedLossDSMatchedSeed42 | Full MoLG network with the reviewed composite loss and matched deep supervision |
+| `full_molg` | SIGF | Full modality front end, CNN/Swin encoders, and gated residual fusion |
+| `no_maf` | NoMAF | Replaces the complete modality-specific stems and attention aggregation with shared `ConvNormAct3D(4,24)` |
+| `no_swin` | NoSwin | Retains the modality front end and CNN; removes the Swin encoder and its five fusion units |
+| `concat_fusion` | ConcatFusion | Retains both encoders; replaces all five gated fusion units with concatenation and 1×1×1 `ConvNormAct3D` |
 
-The reference implementation is
-nnUNetTrainerParallelModalSwinUNetB24. The proposed-loss deep-supervision
-weights are [8/15, 4/15, 2/15, 1/15, 0], with the TC false-positive term
-applied only at the highest-resolution output. The standard variants use the
-standard nnU-Net region Dice+BCE loss and its standard deep-supervision path.
-NoSwin and proposed-loss/DS-matched are retained; they are not removed because
-their observed result is different.
+NoMAF evaluates the modality front end as a whole. The NoSwin result is retained
+as reported; the full network is not assumed to be best on every cohort.
 
-The earlier FedMoLG-TCFP federated/100-round prototype is retained under
-legacy/fedmolg_tcfp. That historical entry, including its Dice-HD95 selection
-utilities, is not the default current reproduction route.
+`proposed_loss_ds_matched` is an **additional experiment**, not the SIGF main
+model reported in the manuscript. It uses boundary/curvature terms and a
+TC false-positive penalty. Its code remains available separately from the
+paper's standard-loss experiments. The earlier federated/100-round prototype
+is retained in [`legacy/fedmolg_tcfp`](legacy/fedmolg_tcfp).
 
-## Frozen scientific contract
+## Training and evaluation settings
 
-- Dataset901_BraTS2023_TCRegion, configuration 3d_fullres, plans nnUNetPlans,
-  fold all.
-- Four input channels in order T1, T1ce, T2, FLAIR.
-- Seed 42, 1000 epochs, 250 training iterations and 50 validation iterations
-  per epoch.
-- Patch [128, 160, 112], batch size 2, AMP and torch.compile enabled.
-- SGD with initial learning rate 0.01, momentum 0.99, Nesterov enabled and
-  weight decay 3e-5; nnU-Net polynomial learning-rate schedule.
-- Data augmentation and normalization remain the frozen nnU-Net pipeline.
-- 876 training cases, 375 internal evaluation cases and 100 external novel
-  cases. Internal and external cases are never training cases.
+- `Dataset901_BraTS2023_TCRegion`, `3d_fullres`, supplied `nnUNetPlans`,
+  and `fold=all`.
+- Patch size `[128, 160, 112]`, batch size 2, and 1,000 epochs.
+- 1 mm isotropic spacing and foreground-mask Z-score normalization for each
+  sequence, as specified in the frozen plans.
+- Nesterov SGD, initial learning rate 0.01, momentum 0.99, weight decay
+  `3e-5`, and the nnU-Net polynomial learning-rate schedule.
+- Standard nnU-Net augmentation, 250 training iterations and 50 training-time
+  monitoring iterations per epoch, AMP, and `torch.compile`.
+- Formal testing uses `checkpoint_final.pth`, sliding-window inference with
+  mirroring, and fixed hierarchical connected-component postprocessing.
 
-The 876-case membership was recovered from the complement of the frozen
-internal set within the 2023 archive and checked against matching historical
-case-metrics CSV files. It was not recovered from an original
-splits_final.json; the public repository therefore publishes the method and
-format, not the case identifiers.
+The `full_molg` trainer does not set the model RNG seed through
+`NNUNET_RUN_SEED`. The three structural ablation trainers set seed 42 through
+`SeededTrainerMixin`. A seed value written in an older launcher record is not
+proof that the main trainer applied it; see
+[reproduction details](docs/reproduction.md#seed-behavior-and-resume).
 
-## Environment
+The manuscript uses 876 training cases, a 375-case BraTS 2023 test list, and a
+100-case image-deduplicated BraTS-GoAT 2024 supplemental cohort. The existing
+CLI group name `external_novel100` refers to that supplemental cohort; the
+name does not establish clinical external validation.
 
-The current verified runtime uses Python 3.10.x, nnunetv2 2.8.0,
-dynamic-network-architectures 0.4.4 and timm 1.0.22. The verified GPU profile
-is:
+## Reproduction
 
-- Blackwell/RTX 5090: Torch 2.7.1+cu128, torchvision 0.22.1+cu128, Triton
-  3.3.1.
-An Ada/RTX 4090 cu118 recipe is retained as an explicitly separate
-alternative, but it requires its own Linux installation and GPU preflight;
-it is not claimed as validated by this release.
+Start with [the reproduction guide](docs/reproduction.md). It covers the
+Linux environment, data preparation, frozen preprocessing, training, and
+final-checkpoint evaluation. The main-model experiment key is **`full_molg`**.
 
-The exact common recipe is requirements/constraints-common-runtime.txt and one
-profile file. The old timm 1.0.27 file is not part of the default recipe.
-provenance/environment_freeze_public.txt records the actual verified package
-versions without private wheel URLs.
+The public release contains source code and frozen metadata. It does not
+include MRI scans, case lists, weights, predictions, complete logs, or
+case-level results. Recreating the manuscript's exact cohorts requires the
+membership information described in [the data guide](docs/data.md); the
+public data sources alone do not supply this study-specific split.
 
-Install and verify on an authorized Linux host:
+The recorded environment uses Python 3.10.x, nnunetv2 2.8.0,
+dynamic-network-architectures 0.4.4, and timm 1.0.22. The Blackwell/RTX 5090
+recipe uses Torch 2.7.1+cu128; a separate Ada/RTX 4090 cu118 recipe is also
+provided. Each target host needs its own installation and GPU preflight.
 
-    bash scripts/install_environment.sh --profile blackwell5090-cu128 --prefix /persistent/molg/envs/molg-cu128
-    bash scripts/install_environment.sh --profile blackwell5090-cu128 --prefix /persistent/molg/envs/molg-cu128 --apply
-    /persistent/molg/envs/molg-cu128/bin/python scripts/install_custom_trainer.py --apply
-    /persistent/molg/envs/molg-cu128/bin/python scripts/verify_environment.py --profile blackwell5090-cu128 --out /persistent/molg/reports/environment.json
+[Metric definitions](docs/metrics.md) specify the NSD tolerance, HD95 empty-mask
+rule, and component thresholds. Training pseudo Dice is a monitoring signal;
+formal results use the designated test cohort and final checkpoint.
 
-The first command is inspect-only; --apply is required for any installation.
-The installer requires Linux, Python 3.10 and a matching GPU profile. It does
-not install drivers, upload code, rent instances or alter a global Python.
+## Validation and release history
 
-## Data preparation
+[Validation status](docs/validation_status.md) distinguishes static checks
+from execution with the scientific runtime. The current public clone has not
+been used here to complete GPU training or reproduce the manuscript tables.
 
-Use only legally obtained data and the authorized membership files. The
-lossless utility in runtime/baselines/prepare_data_lossless.py:
+See [release notes](docs/release_notes.md),
+[source and packaging changes](docs/source_diff.md), and
+[security information](docs/security.md).
 
-- streams nested 2023 ZIP NIfTI members without loading and re-serializing
-  voxel arrays;
-- copies existing GoAT .nii.gz payloads byte-for-byte;
-- rejects path traversal, non-regular archive members, duplicate modalities,
-  incomplete markers and unmarked collisions;
-- does not run an automatic planner or invent a split.
+## Citation and license
 
-The full membership, lossless staging and frozen preprocessing commands are
-documented in docs/data.md. Keep raw/staged/preprocessed data on a data volume
-and code, logs, checkpoints and recovery records on a separate persistent
-volume.
+Software citation metadata is provided in [`CITATION.cff`](CITATION.cff) and
+[`.zenodo.json`](.zenodo.json). Cite the actual version or commit used; use a
+release DOI only when that release has one.
 
-## Training
-
-The public launcher is inspect-only unless --execute-training is supplied.
-It accepts full_molg, no_maf, no_swin, concat_fusion and
-proposed_loss_ds_matched. A real run requires a current preflight report and
-an empty persistent run root:
-
-    /persistent/molg/envs/molg-cu128/bin/python scripts/preflight.py --experiment proposed_loss_ds_matched --profile blackwell5090-cu128 --data-root /data/molg --persistent-root /persistent/molg --out /persistent/molg/preflight/proposed_loss_ds_matched.json --execute
-    CUDA_VISIBLE_DEVICES=0 bash scripts/train_one_experiment.sh --experiment proposed_loss_ds_matched --profile blackwell5090-cu128 --env-prefix /persistent/molg/envs/molg-cu128 --data-root /data/molg --persistent-root /persistent/molg --run-root /persistent/molg/runs/proposed_loss_ds_matched-YYYYMMDD --preflight /persistent/molg/preflight/proposed_loss_ds_matched.json --execute-training
-
-The launcher records the actual trainer, run paths, command, worker setting,
-thread settings and exit status. It creates an independent short
-/tmp/molg-* directory per run. A resume may use only that run's
-checkpoint_latest.pth with nnU-Net's full-state --c path; it does not rename a
-best checkpoint or silently fall back to a new run. The checkpoint contract
-checker is CPU-only and reports field completeness; actual restoration is
-proven only by loading the checkpoint with the installed trainer.
-
-## Evaluation
-
-The evaluator in runtime/baselines/evaluate_prediction_folder.py computes
-WT, TC and ET case-level Dice, HD95 and NSD. It maps source label 4 to 3,
-uses hierarchical connected-component thresholds WT 300, TC 50 and ET 30,
-and applies the fixed HD95 rule: both masks empty is 0, exactly one empty or
-an empty surface is 374. Summary standard deviations use ddof=1.
-
-Training pseudo Dice is not an internal375 or external novel100 test result.
-Formal evaluation uses the corresponding checkpoint_final.pth, the authorized
-case group, and the fixed inference/post-processing contract. See
-docs/metrics.md for the command and details.
-
-## Validation status and scope
-
-This release has passed local Python parsing, shell parsing, JSON contract
-checks, public-material scans, source-hash comparison to the reviewed
-recipe-v2 snapshot, and dependency-free synthetic checks. It has not been
-cold-start installed or GPU-validated from this public clone on the Mac
-authoring environment. Real data staging, frozen preprocessing, GPU
-preflight, training, resume execution and full internal/external reproduction
-remain host- and data-dependent.
-
-No claim is made that the model is universally superior, that results are
-selected by this repository, or that a paper has been accepted. See
-docs/reproduction.md, docs/data.md, docs/metrics.md,
-docs/release_notes.md and docs/security.md.
-
-## Citation
-
-For a published version, cite the versioned GitHub Release and its Zenodo DOI.
-The machine-readable citation metadata is kept in CITATION.cff and
-.zenodo.json. The release does not include private data, weights or
-case-level results.
-
-## License
-
-Authored repository material is provided under the MIT License in LICENSE.
-Dependencies remain under their own licenses; see
-THIRD_PARTY_NOTICES.md.
+Authored repository material is provided under the [MIT License](LICENSE).
+Dependencies retain their own licenses; see
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).

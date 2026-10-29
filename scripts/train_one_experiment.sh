@@ -15,6 +15,8 @@ PREFLIGHT=""
 AUG_WORKERS=4
 RESUME=0
 EXECUTE=0
+RUN_SEED=42
+SEED_POLICY=fixed_by_seeded_trainer
 
 usage() {
     printf '%s\n' \
@@ -41,7 +43,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 case "$EXPERIMENT" in
-    full_molg) TRAINER=nnUNetTrainerParallelModalSwinUNetB24 ;;
+    full_molg) TRAINER=nnUNetTrainerParallelModalSwinUNetB24; RUN_SEED=unfixed; SEED_POLICY=not_fixed_by_entrypoint ;;
     no_maf) TRAINER=nnUNetTrainerParallelModalSwinUNetB24NoMAF ;;
     no_swin) TRAINER=nnUNetTrainerParallelModalSwinUNetB24NoSwin ;;
     concat_fusion) TRAINER=nnUNetTrainerParallelModalSwinUNetB24ConcatFusion ;;
@@ -59,8 +61,8 @@ if [[ "$EXECUTE" -eq 0 ]]; then
     printf '%s\n' \
         "experiment=$EXPERIMENT" "trainer=$TRAINER" "profile=$PROFILE" \
         'dataset=901 configuration=3d_fullres plans=nnUNetPlans fold=all' \
-        'seed=42 epochs=1000 train_iterations=250 validation_iterations=50 patch=128,160,112 batch=2' \
-        "augmentation_workers=$AUG_WORKERS validation_workers=$(( (AUG_WORKERS + 1) / 2 )) library_threads=1 amp=true compile=true resume=$RESUME"
+        "seed=$RUN_SEED seed_policy=$SEED_POLICY epochs=1000 train_iterations=250 validation_iterations=50 patch=128,160,112 batch=2" \
+        "augmentation_workers=$AUG_WORKERS validation_workers=$(( AUG_WORKERS / 2 > 0 ? AUG_WORKERS / 2 : 1 )) library_threads=1 amp=true compile=true resume=$RESUME"
     exit 0
 fi
 
@@ -111,19 +113,39 @@ if [[ "$RESUME" -eq 1 ]]; then
     [[ -f "$MODEL_DIR/checkpoint_latest.pth" ]] || { printf '%s\n' 'Same-run checkpoint_latest.pth is missing.' >&2; exit 70; }
     "$PYTHON" "$ROOT/scripts/checkpoint_contract.py" \
         --checkpoint "$MODEL_DIR/checkpoint_latest.pth" --out "$RUN_ROOT/resume_checkpoint_contract.json"
-    "$PYTHON" - "$RUN_ROOT/run_identity.json" "$EXPERIMENT" "$TRAINER" <<'PY'
+    "$PYTHON" - "$RUN_ROOT/run_identity.json" "$EXPERIMENT" "$TRAINER" "$RUN_SEED" "$SEED_POLICY" "$RUN_ROOT/resume_identity_check.json" <<'PY'
 import json, sys
 payload = json.loads(open(sys.argv[1], encoding="utf-8").read())
-for key, value in (("experiment", sys.argv[2]), ("trainer", sys.argv[3]), ("total_epochs", 1000), ("seed", 42)):
+for key, value in (("experiment", sys.argv[2]), ("trainer", sys.argv[3]), ("total_epochs", 1000)):
     if payload.get(key) != value:
         raise SystemExit(f"same-run identity mismatch for {key}")
+expected_seed = None if sys.argv[4] == "unfixed" else int(sys.argv[4])
+legacy_unverified_seed = (
+    sys.argv[2] == "full_molg" and "seed_policy" not in payload and payload.get("seed") == 42
+)
+if not legacy_unverified_seed and payload.get("seed") != expected_seed:
+    raise SystemExit("same-run identity mismatch for seed")
+if "seed_policy" in payload and payload["seed_policy"] != sys.argv[5]:
+    raise SystemExit("same-run identity mismatch for seed_policy")
+record = {
+    "experiment": sys.argv[2], "trainer": sys.argv[3],
+    "entrypoint_seed": expected_seed, "seed_policy": sys.argv[5],
+    "recorded_identity_seed": payload.get("seed"),
+    "legacy_seed_metadata_unverified": legacy_unverified_seed,
+    "note": "The existing run identity is preserved. Legacy full_molg seed=42 metadata does not prove that the trainer set a seed. Checkpoint field checks do not prove restoration; nnU-Net --c must restore this run's complete checkpoint state.",
+}
+open(sys.argv[6], "w", encoding="utf-8").write(json.dumps(record, indent=2, sort_keys=True) + "\n")
+if legacy_unverified_seed:
+    print("Legacy full_molg seed=42 metadata is unverified; preserving run_identity.json and recording the correction separately.", file=sys.stderr)
 PY
 else
-    "$PYTHON" - "$RUN_ROOT/run_identity.json" "$EXPERIMENT" "$TRAINER" "$PROFILE" "$RUN_ROOT" "$AUG_WORKERS" <<'PY'
+    "$PYTHON" - "$RUN_ROOT/run_identity.json" "$EXPERIMENT" "$TRAINER" "$PROFILE" "$RUN_ROOT" "$AUG_WORKERS" "$RUN_SEED" "$SEED_POLICY" <<'PY'
 import json, sys, time
 payload = {
     "status": "TRAINING_STARTED", "experiment": sys.argv[2], "trainer": sys.argv[3],
-    "profile": sys.argv[4], "run_root": sys.argv[5], "seed": 42, "total_epochs": 1000,
+    "profile": sys.argv[4], "run_root": sys.argv[5],
+    "seed": None if sys.argv[7] == "unfixed" else int(sys.argv[7]),
+    "seed_policy": sys.argv[8], "total_epochs": 1000,
     "train_iterations_per_epoch": 250, "validation_iterations_per_epoch": 50,
     "patch_size": [128, 160, 112], "batch_size": 2,
     "augmentation_workers": int(sys.argv[6]), "validation_workers_derived": max(1, int(sys.argv[6]) // 2),
@@ -134,7 +156,12 @@ open(sys.argv[1], "x", encoding="utf-8").write(json.dumps(payload, indent=2, sor
 PY
 fi
 
-export NNUNET_RUN_SEED=42
+if [[ "$RUN_SEED" == unfixed ]]; then
+    # The historical B24 trainer does not consume this variable.
+    unset NNUNET_RUN_SEED
+else
+    export NNUNET_RUN_SEED="$RUN_SEED"
+fi
 export NNUNET_NUM_EPOCHS=1000
 export nnUNet_compile=true
 export nnUNet_n_proc_DA="$AUG_WORKERS"

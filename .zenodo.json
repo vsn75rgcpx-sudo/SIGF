@@ -1,9 +1,9 @@
 {
-  "title": "MoLG-UNet",
-  "description": "Modality-aware local-global U-Net for multimodal brain tumor segmentation. This software release contains the current nnU-Net v2 implementation, formal ablation configurations, frozen metadata, reproducibility scripts, and evaluation definitions. It does not contain clinical data, case lists, checkpoints, predictions, or environment images.",
+  "title": "SIGF: Sequence Integration and Gated Fusion for Brain Tumor Segmentation",
+  "description": "SIGF combines sequence-specific shallow MRI feature extraction, voxel-wise modality attention and multiscale gated fusion of parallel CNN and hierarchical Swin encoders. The original MoLG-UNet repository and implementation identifiers are retained for compatibility. The paper workflow uses standard nnU-Net region Dice-BCE supervision for the full model and three structural ablations; a separate composite-loss experiment is included as additional work. The code package includes frozen metadata, training and evaluation entry points, but does not include clinical data, case lists, checkpoints, predictions, full logs or environment images.",
   "creators": [
     {
-      "name": "Yang Zhifu"
+      "name": "Yang, Zhifu"
     }
   ],
   "license": "MIT",

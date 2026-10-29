@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 from pathlib import Path
 
 
@@ -9,14 +10,16 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_config_contains_current_variants_and_scientific_contract():
     config = json.loads((ROOT / "config/experiments.json").read_text())
-    assert config["project"]["name"] == "MoLG-UNet"
-    assert config["scientific_contract"]["seed"] == 42
+    assert config["project"]["name"] == "SIGF"
+    assert config["project"]["legacy_name"] == "MoLG-UNet"
+    assert config["formal_experiments"]["full_molg"]["seed"] is None
     assert config["scientific_contract"]["total_epochs"] == 1000
     assert config["scientific_contract"]["patch_size"] == [128, 160, 112]
-    weights = config["formal_experiments"]["proposed_loss_ds_matched"]["deep_supervision_weights"]
+    weights = config["additional_experiments"]["proposed_loss_ds_matched"]["deep_supervision_weights"]
     expected = [8 / 15, 4 / 15, 2 / 15, 1 / 15, 0.0]
     assert all(abs(actual - wanted) < 1e-15 for actual, wanted in zip(weights, expected))
-    assert set(config["formal_experiments"]) == {"no_maf", "no_swin", "concat_fusion", "proposed_loss_ds_matched"}
+    assert set(config["formal_experiments"]) == {"full_molg", "no_maf", "no_swin", "concat_fusion"}
+    assert set(config["additional_experiments"]) == {"proposed_loss_ds_matched"}
 
 
 def test_current_runtime_and_recipes_exist():
@@ -73,7 +76,7 @@ def test_public_text_has_no_private_runtime_identifiers():
         if (
             not path.is_file()
             or ".git" in path.parts
-            or path == Path(__file__)
+            or path == Path(__file__).resolve()
             or path.suffix in {".png", ".jpg", ".pyc"}
         ):
             continue
@@ -83,3 +86,13 @@ def test_public_text_has_no_private_runtime_identifiers():
             continue
         for needle in needles:
             assert needle not in text, f"{needle} in {path}"
+
+
+def test_published_source_manifest_files_exist_and_match_hashes():
+    for line in (ROOT / "provenance/source_code_sha256.txt").read_text().splitlines():
+        if not line.strip():
+            continue
+        expected, relative = line.split(maxsplit=1)
+        path = ROOT / relative
+        assert path.is_file(), relative
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == expected, relative

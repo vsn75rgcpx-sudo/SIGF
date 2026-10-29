@@ -1,26 +1,41 @@
-# Source and packaging differences
+# Source and packaging changes
 
-The files under runtime/ were copied from the reviewed recipe-v2 runtime
-snapshot. Three legacy model-helper files had trailing whitespace removed as
-a non-semantic packaging cleanup; their published SHA-256 values are listed in
-provenance/source_code_sha256.txt. The executable source, model, trainer,
-loss, data utility and evaluator behavior was not changed.
+## Runtime source
 
-The following changes are public packaging changes, not scientific changes:
+Files under `runtime/` came from the reviewed recipe-v2 snapshot. Three model
+helper files had trailing whitespace removed during the original packaging;
+the published source hashes are recorded in
+`provenance/source_code_sha256.txt`.
 
-1. The original FedMoLG-TCFP prototype was moved under
-   legacy/fedmolg_tcfp so it remains available but is not confused with the
-   current nnU-Net v2 entry point.
-2. The public config/experiments.json describes the current variants and keeps
-   the proposed matched deep-supervision weights explicit.
-3. New path-parameterized entry points replace private deployment paths:
-   install_environment.sh, install_custom_trainer.py, verify_environment.py,
-   preflight.py, train_one_experiment.sh, prepare_data.sh,
-   preprocess_frozen.py, preprocess_frozen.sh and evaluate_one_experiment.sh.
-   They refuse implicit installation, preprocessing, training or evaluation.
-4. Private membership manifests, source paths, run identities, wheel URLs,
-   weights, predictions and logs were not copied.
+The 2026-10-29 SIGF alignment preserves the runtime model, trainer, loss,
+data preparation, and evaluator implementations. It does not change layers,
+loss equations, label mapping, component thresholds, HD95 handling, optimizer,
+learning-rate schedule, patch size, batch size, or epoch count.
 
-No model layer, loss equation, label mapping, post-processing threshold,
-HD95 rule, optimizer, learning-rate schedule, patch, batch or epoch setting
-was changed in this release preparation.
+## SIGF alignment on 2026-10-29
+
+The release presentation now matches the current manuscript:
+
+1. SIGF is the paper-facing name. Existing MoLG Python identifiers and paths
+   remain available for checkpoint and command compatibility.
+2. `config/experiments.json` identifies `full_molg` and the three structural
+   ablations as paper experiments. `proposed_loss_ds_matched` is an additional
+   experiment; its implementation is retained.
+3. Main reproduction examples select the standard-loss `full_molg` entry.
+4. Preflight and launcher records distinguish per-experiment seed behavior.
+   The main B24 trainer does not apply the custom seed variable, while seeded
+   ablation trainers do. Historical metadata is not proof of RNG state.
+5. Data and evaluation documentation identifies the material available in the
+   public package and the extra membership information needed for the exact
+   study cohorts.
+
+These changes correct public configuration and execution records. They do not
+retroactively change the protocol or results of an earlier experiment.
+
+## Original release packaging
+
+The earlier FedMoLG-TCFP prototype was moved to `legacy/fedmolg_tcfp`.
+Path-parameterized install, environment, preflight, preparation, preprocessing,
+training, and evaluation entry points replaced private deployment paths.
+Private membership manifests, source paths, run identities, wheel URLs,
+weights, predictions, and logs were omitted from the public tree.
